@@ -49,8 +49,11 @@ variants usually work): in the low-sigma stretch where colour
 settles, each accepted step's denoised estimate is pushed away
 from its own per-channel spatial mean (colourfulness and feature
 contrast up) and the accepted state is shifted to match, so the
-trajectory itself bends toward richer colour. Above
-color_start sigma it is exactly the base Seren walk.
+trajectory itself bends toward richer colour. The per-step gain
+is scaled by the fraction of the steered band the step covers,
+so the total bend is set by color_strength alone and does not
+grow with step count. Above color_start sigma it is exactly the
+base Seren walk.
 
 Independent implementation, written for this pack.
 """
@@ -206,25 +209,31 @@ def _seren_loop(model, x, extra_args, callback, tolerance, beta,
             if color_strength > 0.0 and 0.0 < s_next <= color_start:
                 # Chroma steering: push this step's denoised
                 # estimate away from its per-channel spatial mean
-                # (colourfulness / feature contrast), ramping in
-                # as sigma falls, and shift the accepted state by
-                # the on-trajectory equivalent (1-s)*delta. The
-                # shift is capped at 10% of the state's RMS per
-                # step so the steering can bend the trajectory
-                # but never run away with it (an uncapped draft
-                # diverged in the mirror test).
-                d = x_trap - s_next * v_pred
-                dims = tuple(range(2, x.ndim))
-                mu = d.mean(dim=dims, keepdim=True)
-                w = 1.0 - s_next / float(color_start)
-                gain = 1.0 + float(color_strength) * w
-                d2 = mu + (d - mu) * gain
-                delta = (1.0 - s_next) * (d2 - d)
-                dr = _rms(delta)
-                cap = 0.10 * _rms(x)
-                if dr > cap and dr > 0.0:
-                    delta = delta * (cap / dr)
-                x = x + delta
+                # (colourfulness / feature contrast) and shift
+                # the accepted state by the on-trajectory
+                # equivalent (1-s)*delta. The per-step gain is
+                # the full-band gain raised to the fraction of
+                # the steered band this step actually covers, so
+                # the TOTAL bend across the band is set by
+                # color_strength alone and does not grow with
+                # step count (a constant per-step gain made
+                # dense refine walks overshoot - v0.2.2 fix).
+                # The 10% RMS cap stays as a runaway guard.
+                band_top = min(sigma, float(color_start))
+                frac = (band_top - s_next) / float(color_start)
+                if frac > 0.0:
+                    d = x_trap - s_next * v_pred
+                    dims = tuple(range(2, x.ndim))
+                    mu = d.mean(dim=dims, keepdim=True)
+                    w = 1.0 - s_next / float(color_start)
+                    gain = (1.0 + float(color_strength) * w) ** frac
+                    d2 = mu + (d - mu) * gain
+                    delta = (1.0 - s_next) * (d2 - d)
+                    dr = _rms(delta)
+                    cap = 0.10 * _rms(x)
+                    if dr > cap and dr > 0.0:
+                        delta = delta * (cap / dr)
+                    x = x + delta
             v = v_pred
             m = b * m + (1.0 - b) * v_pred
             t = t_next

@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-seren-sampler"
-version = "0.2.1"
+version = "0.2.2"
 description = "Seren Sampler: momentum-predicted, tolerance-controlled rectified flow sampling, for ComfyUI (Anima family)"
 license = "MIT"
 requires-python = ">=3.10"

@@ -64,9 +64,11 @@ boost: in the low-sigma stretch (`sigma <= color_start`, default
 estimate is pushed away from its per-channel spatial mean and
 the state is shifted to match, bending the trajectory toward
 richer colour while the model keeps re-denoising it. The
-per-step shift is capped at 10% of the state RMS so the steering
-cannot run away. Extra inputs: `color_strength` (default 0.15),
-`color_start`.
+per-step gain is scaled by the fraction of the steered band the
+step covers, so the total bend is set by `color_strength` alone
+and does not grow with step count; the per-step shift is also
+capped at 10% of the state RMS as a runaway guard. Extra
+inputs: `color_strength` (default 0.15), `color_start`.
 
 ## KSampler registration
 
@@ -103,15 +105,15 @@ strength rises, because every hard step gets shaken. If a
 result looks unstable, lower strength before touching
 tolerance.
 
-**Seren Color** - the steering is applied at *every* accepted
-step in the low-sigma band, so the effect accumulates:
-`color_strength` reads much stronger than the same number
-would as a one-shot boost. Start at 0.1-0.15 (the registered
+**Seren Color** - `color_strength` sets the *total* bend
+across the steered band: each step applies the fraction of it
+that the step actually covers, so the effect is the same at
+any step count - a standalone run and a dense refine walk read
+the number the same way. Start at 0.1-0.15 (the registered
 default is 0.15, calibrated after 0.35 proved garish in
 practice). For a stronger effect, raise `color_start` (steer
-more of the trajectory) rather than cranking strength, and
-note the per-step shift is capped at 10% of the state RMS, so
-very high strengths saturate instead of scaling linearly.
+more of the trajectory) rather than cranking strength; the
+per-step shift is capped at 10% of the state RMS as a guard.
 
 **Two-stage refine recipe** - a good pairing is: stage 1 any
 sampler at denoise 1.0, stage 2 `seren` or `seren_color` at
@@ -174,8 +176,9 @@ flow 전용이며, KSampler 드롭다운에도 `seren`이라는 이름으로
 매 스텝의 예측 완성본을 채널 평균에서 밀어내 궤적 자체를
 풍부한 색 쪽으로 굽혀요.
 
-사용법 요점: color의 효과는 스텝마다 누적되니 0.1~0.15에서
-시작하세요 (0.35는 실측에서 과했어요). 2단 리파인으로는
+사용법 요점: color의 총량은 strength 하나로 정해지고 스텝 수에
+따라 불어나지 않아요. 0.1~0.15에서 시작하세요 (0.35는 실측에서
+과했어요). 2단 리파인으로는
 1단 아무 샘플러 denoise 1.0 + 2단 seren/seren_color
 0.3~0.4 조합이 잘 맞아요. 고정 시드에서는 확률형 포함
 전부 재현돼요.

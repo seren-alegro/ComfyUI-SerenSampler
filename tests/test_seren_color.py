@@ -15,6 +15,11 @@ field's denoised is an extrapolating linear map, so uncapped
 steering formed a gain loop and diverged in this mirror (shift
 ~1e8 at strength 1.0). The cap keeps the mechanism's direction
 while removing the runaway, on any field.
+
+Since v0.2.2 the per-step gain is the full-band gain raised to
+the fraction of the steered band the step covers, so the total
+bend is set by color_strength alone instead of accumulating per
+step (a constant per-step gain overshot on dense refine walks).
 """
 import numpy as np
 
@@ -74,19 +79,22 @@ def walk(x, tol, beta, max_steps, color_strength=0.0,
         if err <= tol or abs(dt_trial) <= MIN_DT:
             x = x_trap
             if color_strength > 0.0 and 0.0 < s_next <= color_start:
-                d = x_trap - s_next * v_pred
-                dims = tuple(range(2, x.ndim))
-                mu = d.mean(axis=dims, keepdims=True)
-                w = 1.0 - s_next / float(color_start)
-                gain = 1.0 + float(color_strength) * w
-                d2 = mu + (d - mu) * gain
-                delta = (1.0 - s_next) * (d2 - d)
-                dr = rms(delta)
-                cap = 0.10 * rms(x)
-                if dr > cap and dr > 0.0:
-                    delta = delta * (cap / dr)
-                x = x + delta
-                stats["steered"] += 1
+                band_top = min(sigma, float(color_start))
+                frac = (band_top - s_next) / float(color_start)
+                if frac > 0.0:
+                    d = x_trap - s_next * v_pred
+                    dims = tuple(range(2, x.ndim))
+                    mu = d.mean(axis=dims, keepdims=True)
+                    w = 1.0 - s_next / float(color_start)
+                    gain = (1.0 + float(color_strength) * w) ** frac
+                    d2 = mu + (d - mu) * gain
+                    delta = (1.0 - s_next) * (d2 - d)
+                    dr = rms(delta)
+                    cap = 0.10 * rms(x)
+                    if dr > cap and dr > 0.0:
+                        delta = delta * (cap / dr)
+                    x = x + delta
+                    stats["steered"] += 1
             v = v_pred
             m = beta * m + (1.0 - beta) * v_pred
             t = t_next
@@ -113,6 +121,20 @@ def main():
         assert np.all(np.isfinite(xf))
         assert st["steered"] > 0, "steering never engaged"
         assert shift > 1e-3, "steering must move the endpoint"
+
+    # Step-count invariance (v0.2.2): the steering displacement
+    # against each tolerance's own unsteered walk must stay in
+    # the same band whether the walk takes ~30 or ~100 steps.
+    # Measured: tol 0.005 -> 0.52, tol 0.0005 -> 0.50.
+    disps = {}
+    for tol in (0.005, 0.0005):
+        b, _ = walk(x0.copy(), tol, 0.5, 200, color_strength=0.0)
+        c, _ = walk(x0.copy(), tol, 0.5, 200, color_strength=0.35)
+        disps[tol] = rms(c - b)
+        print(f"tol={tol}: steering displacement={disps[tol]:.4f}")
+        assert disps[tol] > 0.05, "steering must be active"
+    ratio = disps[0.0005] / disps[0.005]
+    assert 0.6 < ratio < 1.6, f"displacement must not scale with steps (ratio {ratio:.2f})"
     print("all checks passed")
 
 
