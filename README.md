@@ -65,7 +65,7 @@ estimate is pushed away from its per-channel spatial mean and
 the state is shifted to match, bending the trajectory toward
 richer colour while the model keeps re-denoising it. The
 per-step shift is capped at 10% of the state RMS so the steering
-cannot run away. Extra inputs: `color_strength` (default 0.35),
+cannot run away. Extra inputs: `color_strength` (default 0.15),
 `color_start`.
 
 ## KSampler registration
@@ -73,7 +73,7 @@ cannot run away. Extra inputs: `color_strength` (default 0.35),
 The pack also registers **`seren`**, **`seren_sde`** and
 **`seren_color`** in the standard KSampler `sampler_name`
 dropdown, with fixed defaults (tolerance 0.01, beta 0.5;
-sde_strength 0.3 / color_strength 0.35 for the siblings; shift
+sde_strength 0.3 / color_strength 0.15 for the siblings; shift
 estimated from the incoming sigma grid). Use any scheduler with
 them; the walk adapts its own steps between the grid's
 endpoints. The standalone nodes remain the way to tune the

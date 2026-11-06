@@ -414,7 +414,7 @@ class SerenColorSampler:
                                    "max": 0.95, "step": 0.05}),
                 "max_steps": ("INT", {"default": 120, "min": 4,
                                       "max": 500}),
-                "color_strength": ("FLOAT", {"default": 0.35,
+                "color_strength": ("FLOAT", {"default": 0.15,
                                              "min": 0.0, "max": 2.0,
                                              "step": 0.05}),
                 "color_start": ("FLOAT", {"default": 0.35, "min": 0.1,
@@ -464,7 +464,7 @@ class SerenColorSampler:
 
 # ---------------------------------------------------------- KSampler
 # dropdown registration with fixed defaults (tolerance 0.01,
-# beta 0.5, sde_strength 0.3 / color_strength 0.35 for the
+# beta 0.5, sde_strength 0.3 / color_strength 0.15 for the
 # siblings, shift estimated from the incoming grid). The
 # standalone nodes above remain the way to tune the knobs.
 def _seren_registered(model, x, sigmas, extra_args=None,
@@ -505,7 +505,7 @@ def _seren_color_registered(model, x, sigmas, extra_args=None,
     stats = {"accepted": 0, "trials": 0, "evals": 0}
     out = _seren_loop(model, x, extra_args or {}, callback,
                       DEFAULT_TOLERANCE, DEFAULT_BETA, shift, 120,
-                      stats, t_start=t_start, color_strength=0.35,
+                      stats, t_start=t_start, color_strength=0.15,
                       color_start=0.35)
     print(f"[SerenColor] registered run: shift~{shift:.2f}, "
           f"accepted={stats['accepted']}, evals={stats['evals']}")
