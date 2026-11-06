@@ -79,6 +79,49 @@ them; the walk adapts its own steps between the grid's
 endpoints. The standalone nodes remain the way to tune the
 knobs.
 
+## Usage
+
+Two ways to run every sampler: the standalone nodes (all knobs
+exposed) or the KSampler dropdown registrations (fixed defaults,
+any scheduler - the walk builds its own steps between the grid's
+endpoints). With a fixed seed everything in this pack is fully
+reproducible, including the SDE sibling: its noise is
+seed-driven, so the same seed returns the same image.
+
+**Seren (base)** - start from the defaults. `tolerance` is the
+main quality/speed dial: 0.01 is a good middle, smaller is
+slower and more faithful, larger is faster and looser.
+`beta` 0.5 is the balanced memory; longer memory (0.7+) walks
+smoother but can drag stale direction through hard curves.
+`max_steps` is a budget cap, not a step count - the
+`steps_used` / `evals_used` outputs show what a run cost.
+
+**Seren SDE** - `sde_strength` 0 is exactly the base walk.
+0.2-0.3 gives visible variation while staying close to the
+deterministic trajectory; expect the endpoint to move more as
+strength rises, because every hard step gets shaken. If a
+result looks unstable, lower strength before touching
+tolerance.
+
+**Seren Color** - the steering is applied at *every* accepted
+step in the low-sigma band, so the effect accumulates:
+`color_strength` reads much stronger than the same number
+would as a one-shot boost. Start at 0.1-0.15 (the registered
+default is 0.15, calibrated after 0.35 proved garish in
+practice). For a stronger effect, raise `color_start` (steer
+more of the trajectory) rather than cranking strength, and
+note the per-step shift is capped at 10% of the state RMS, so
+very high strengths saturate instead of scaling linearly.
+
+**Two-stage refine recipe** - a good pairing is: stage 1 any
+sampler at denoise 1.0, stage 2 `seren` or `seren_color` at
+denoise 0.3-0.4 for a deterministic finishing pass. One
+warning: splitting denoise across two KSamplers does *not*
+split this walk - a registered Seren run always walks to
+completion from the sigma it is handed (img2img semantics), so
+for a true mid-trajectory hand-off put a grid sampler (euler,
+dpmpp_2m_sde, ...) in stage 1.
+
 ## Install
 
 ```
@@ -130,3 +173,9 @@ flow 전용이며, KSampler 드롭다운에도 `seren`이라는 이름으로
 않고 보행 도중에 다뤄요: 색이 자리 잡는 낮은 시그마 구간에서
 매 스텝의 예측 완성본을 채널 평균에서 밀어내 궤적 자체를
 풍부한 색 쪽으로 굽혀요.
+
+사용법 요점: color의 효과는 스텝마다 누적되니 0.1~0.15에서
+시작하세요 (0.35는 실측에서 과했어요). 2단 리파인으로는
+1단 아무 샘플러 denoise 1.0 + 2단 seren/seren_color
+0.3~0.4 조합이 잘 맞아요. 고정 시드에서는 확률형 포함
+전부 재현돼요.
